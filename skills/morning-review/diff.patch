@@ -1,0 +1,233 @@
+--- a/.claude/skills/morning-review/SKILL.md (Current)
++++ b/.claude/skills/morning-review/SKILL.md (Recommended)
+@@ -1,9 +1,12 @@
+ ---
+ name: morning-review
++phases: 4
++phase_names: "Overnight Summary, Goals Cascade, Task Scheduling, Briefing Delivery"
+ effort: high
+ description: "Daily morning briefing workflow. Triggered by morning cron. Pulls overnight agent work, checks goals state, cascades goals to agents, schedules tasks, sends briefing to user."
+ triggers: ["morning review", "morning briefing", "good morning", "start my day", "daily briefing", "run morning review"]
+ ---
+
+ # Morning Review
+
+ > The daily entry point for the user's briefing. All instructions are here.
+ > Run this once per day, triggered by the morning-review cron.
+
+ ---
+
+ ## CRITICAL SECURITY — READ FIRST
+@@ -20,20 +23,24 @@
+
+ ---
+
+-## How to Run
++## Execution Overview
+
+-Execute each phase in order.
++Execute phases in strict order:
++1. **Overnight Summary** — what happened while user was asleep
++2. **Goals Cascade** — MANDATORY: set org focus and agent goals before task scheduling
++3. **Task Scheduling** — dispatch today's work
++4. **Briefing Delivery** — send morning summary to user
+
+---
+
+-## Phase 0: Overnight Summary
++## Phase 1: Overnight Summary
+
+ ### 0A: Check all agent heartbeats
+ \`\`\`bash
+ cortextos bus read-all-heartbeats
+ cortextos bus check-inbox
+ \`\`\`
+
+ For each agent, note:
+- Last heartbeat timestamp (flag if >5h stale)
++ Last heartbeat timestamp (flag if >5h stale)
+  - Current task summary from heartbeat
+  - Any completed tasks since last evening review
+
+@@ -41,11 +48,13 @@ For each agent, note:
+
+ \`\`\`bash
+ cortextos bus list-tasks --status completed
+ cortextos bus list-tasks --status in_progress
+ \`\`\`
+
+ Note what was completed overnight, by which agents, and what key deliverables were produced.
+
+ ### 0C: Read yesterday's memory
+
+ \`\`\`bash
+-YESTERDAY=$(date -v-1d +%Y-%m-%d 2>/dev/null || date -d 'yesterday' +%Y-%m-%d)
++YESTERDAY=$(date -u -d 'yesterday' +%Y-%m-%d 2>/dev/null || date -u -v-1d +%Y-%m-%d)
+ cat memory/${YESTERDAY}.md 2>/dev/null || echo "No memory file for yesterday"
+ head -100 MEMORY.md
+ \`\`\`
+
+@@ -55,11 +64,12 @@ Extract: tasks worked on, pending items, promises made, notes carried forward.
+
+ ### 0D: Task reconciliation
+
+ Cross-reference memory COMPLETED entries against tasks still showing in_progress.
+
+ \`\`\`bash
+ cortextos bus list-tasks --status in_progress
+-TODAY=$(date -u +%Y-%m-%d)
++TODAY=$(date -u +%Y-%m-%d)
+ grep "COMPLETED:" memory/${TODAY}.md 2>/dev/null
+ grep "COMPLETED:" memory/${YESTERDAY}.md 2>/dev/null
+ \`\`\`
+
+ For each mismatch, mark completed:
+ \`\`\`bash
+ cortextos bus complete-task "$TASK_ID" --result "<what was produced>"
+@@ -68,70 +78,111 @@ For each mismatch, mark completed:
+
+ ---
+
+-## Phase 1: Goals Cascade (MANDATORY — before task scheduling)
++## Phase 2: Goals Cascade (MANDATORY — before task scheduling)
+
+ ### 1A: Read org goals
+
+ \`\`\`bash
+ cat $CTX_FRAMEWORK_ROOT/orgs/$CTX_ORG/goals.json
+ \`\`\`
+
++### 1A-extra: Verify agent roster
++
++\`\`\`bash
++# Load active agents from enabled-agents.json
++cat $CTX_FRAMEWORK_ROOT/orgs/$CTX_ORG/enabled-agents.json
++\`\`\`
++
++Skip goal cascade for disabled agents.
++
+ ### 1B: Ask user for daily focus
+
+ Send via Telegram:
+ > "Good morning. Our north star is: [north_star]. What's the focus for today? Or should I continue yesterday's priorities?"
+
+-Wait for response.
++**Wait up to 10 minutes for response.** If no response by timeout:
++
++\`\`\`
++Fallback: Continue yesterday's priorities unless you know they've changed.
++Use org goals.json daily_focus from yesterday if it exists.
++Otherwise, pick top 2-3 items from last session's notes.
++\`\`\`
+
+ ### 1C: Update org goals.json with today's focus
+
+ \`\`\`bash
++# Escape user input for JSON
++FOCUS_SAFE=$(echo "$USER_RESPONSE" | jq -Rs .)
+ jq --arg focus "user's stated focus" --arg ts "$(date -u +%Y-%m-%dT%H:%M:%SZ)" \
+     '.daily_focus = $focus | .daily_focus_set_at = $ts' \
+     $CTX_FRAMEWORK_ROOT/orgs/$CTX_ORG/goals.json > /tmp/goals.tmp \
+   && mv /tmp/goals.tmp $CTX_FRAMEWORK_ROOT/orgs/$CTX_ORG/goals.json
+ \`\`\`
++
++**Error handling:** If jq fails, log error and continue with cached yesterday's focus instead of crashing.
+
+ ### 1D: Cascade goals to each active agent
+
+-For each agent in the roster:
++For each agent in enabled-agents.json:
+ 1. Determine 2-5 role-appropriate goals based on their function and today's focus
++   - **Blue** (property ops): 2-3 goals on meld triage, vendor dispatch, property issues
++   - **Collie** (developer): 2-3 goals on Framework/integration work, PR queue
++   - **Aussie** (analyst): 1-2 goals on system health, metrics, anomalies
++   - **Dane** (orchestrator): goals come from daily_focus, flows down from you
+ 2. Write their `goals.json`:
+    \`\`\`bash
+    cat > $CTX_FRAMEWORK_ROOT/orgs/$CTX_ORG/agents/<agent>/goals.json << 'EOF'
+    {
+      "focus": "role-specific focus derived from today's daily_focus",
+      "goals": ["goal 1", "goal 2", "goal 3"],
+      "bottleneck": "",
+      "updated_at": "ISO_TIMESTAMP",
+      "updated_by": "$CTX_AGENT_NAME"
+    }
+    EOF
+    \`\`\`
+ 3. Regenerate GOALS.md:
+    \`\`\`bash
+    cortextos goals generate-md --agent <agent> --org $CTX_ORG
+    \`\`\`
+ 4. Notify agent:
+    \`\`\`bash
+    cortextos bus send-message <agent> normal "New goals for today. Check GOALS.md and create tasks."
+    \`\`\`
++5. Verify agent received message (check heartbeat 1min later):
++   \`\`\`bash
++   sleep 60
++   cortextos bus read-all-heartbeats | grep "<agent>"
++   \`\`\`
++   If agent still offline, log warning and continue (agent may boot up later).
+
+ If an agent's `goals.json` already has `daily_focus_set_at` matching today: skip — don't overwrite.
+
+ ### 1E: Set your own goals
+
+ Write your orchestrator-level goals for today, then regenerate:
+ \`\`\`bash
+ cortextos goals generate-md --agent $CTX_AGENT_NAME --org $CTX_ORG
+ \`\`\`
+
+ ---
+
+-## Phase 2: Task Scheduling
++## Phase 3: Task Scheduling
+
+ ### Evaluate what moves the needle today
+
+ From the overnight summary, identify:
+ - What is the single biggest bottleneck right now?
+ - What can agents prepare to accelerate the user's work?
+ - What requires the user's direct attention?
+ - What can agents complete autonomously?
+
++### Task allocation framework
++
++Allocate daily work across 3 buckets:
++
++**Bucket 1: User actionable** (David's time blocks)
++- Usually 1-3 high-impact items
++- Examples: approval decisions, strategy calls, vendor negotiations, property visits
++
++**Bucket 2: Agent support tasks** (agents helping user)
++- Usually 2-4 tasks
++- Examples: prep research, draft communication, triage backlog, verify vendor responses
++
++**Bucket 3: Agent autonomous tasks** (agents working independently)
++- Usually 1-3 tasks
++- Examples: meld processing, framework PRs, metrics collection, KB indexing
++
++If you can't fit work into these buckets, it's probably yesterday's backlog — surface in briefing.
++
+ ### Three categories of tasks
+
+ **1. What the user should do today** — map to available time blocks
+ **2. Agent support tasks** — work agents do to help the user (prepare, research, draft)
+ **3. Agent autonomous tasks** — work agents complete entirely independently
+
+ For each agent support or autonomous task, create and dispatch:
+ \`\`\`bash
+ TASK_ID=$(cortextos bus create-task "<title>" --desc "<description>" --assignee $CTX_AGENT_NAME --priority high)
+ cortextos bus update-task "$TASK_ID" in_progress
+ cortextos bus send-message <agent> high '<task details with full context>'
+ cortextos bus log-event action task_dispatched info --meta '{"to":"<agent>","task":"<title>"}'
+ \`\`\`
+
++**Error handling:** If any cortextos command fails (task create, send-message), log error, note in briefing, and continue — don't abort workflow.
++
+ ---
+
+-## Phase 3: Briefing Delivery
++## Phase 4: Briefing Delivery
+
+ **Telegram has a 4096 character limit.** Send as separate messages with brief pauses between.
