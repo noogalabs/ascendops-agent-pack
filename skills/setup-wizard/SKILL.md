@@ -41,10 +41,28 @@ Convert to IANA timezone string (e.g. America/New_York, America/Chicago, America
 - PropertyMeld
 - AppFolio
 - Buildium
+- Yardi
+- LeadSimple
+- Monday.com
 - Rent Manager
-- Something else (tell me what)"
+- Something else — just tell me the name"
 
 Save as: `PM_SYSTEM`
+
+**After they answer Q3 — PM software gap check**
+
+Check their answer against the list of supported adapters:
+
+SUPPORTED (adapter exists):
+- PropertyMeld → configure pm-cli-harness and the pm/* skills
+- AppFolio → note that cli-anything-appfolio is available; explain that session capture setup is required after install
+
+NOT SUPPORTED (all others — Buildium, Yardi, LeadSimple, Monday.com, Rent Manager, or anything else):
+- Tell them: "We do not have a direct integration for [PM_SYSTEM] yet, but your agent can still help with triage, communication, and tracking — it just will not be able to pull data from [PM_SYSTEM] automatically. We will add [PM_SYSTEM] to the community wishlist so other users can see the demand and someone can build it."
+- Append to `WISHLIST.md` in the repo root: add a row to the table with software name, today's date (ISO format), and increment the request count by 1 if the software is already listed, or add a new row if it is not.
+- If you cannot write to WISHLIST.md directly (e.g. the repo is not checked out locally), output the exact line to add so the user can submit it as a pull request, and tell them: "If you open a quick pull request adding that line, it helps the community know what to build next."
+
+Save as: `PM_SYSTEM`, `PM_SUPPORTED` (true/false)
 
 ---
 
@@ -116,7 +134,21 @@ Save as: `AGENT_NAME`
 
 ---
 
-## Step 3 — Generate files
+## Step 3 — Update WISHLIST.md (if PM system is not supported)
+
+If `PM_SUPPORTED` is false, update `WISHLIST.md` before generating config files.
+
+Read the current WISHLIST.md table. Find the row matching the user's PM system (case-insensitive).
+- If found: increment the Requests count by 1 and update the row.
+- If not found: add a new row with: software name, "Property management" or appropriate category, count=1, and any notes the user mentioned.
+
+Write the updated file. Then tell the user: "Added [PM_SYSTEM] to the wishlist. Every time someone hits this gap, the count goes up — that is how the community knows what to build next."
+
+If WISHLIST.md cannot be written (repo not checked out), show the user the exact markdown row to add and link them to the CONTRIBUTING.md for how to open a PR.
+
+---
+
+## Step 4 — Generate config files
 
 Now build the files based on their answers. Create each one and show the content to the user as you go, explaining what each file does in one plain-English sentence.
 
@@ -201,7 +233,7 @@ Generate a personalized one-page reference with their org name, agent name, and 
 
 ---
 
-## Step 4 — Installation commands
+## Step 5 — Installation commands
 
 Once all files are generated, show the exact terminal commands to run. Do not show this step until the files above are ready.
 
@@ -224,7 +256,7 @@ Tell them: "Run these one at a time. If any of them throw an error, paste it her
 
 ---
 
-## Step 5 — Confirm and hand off
+## Step 6 — Confirm and hand off
 
 After they confirm the agent is running and they have received a Telegram message from it:
 
