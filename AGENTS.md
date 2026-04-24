@@ -29,6 +29,17 @@ Focused on reporting, summaries, and insight generation. Reads data, builds repo
 
 ---
 
+### hermes
+A specialist agent running on the [Hermes](https://github.com/NousResearch/hermes-agent) Python REPL runtime (`runtime: "hermes"` in config). Uses the same bus mechanics as Claude Code agents — heartbeat, inbox, tasks, events — but Hermes manages its own session state via SQLite and has cross-session memory built in.
+
+**Prerequisite:** `pip install hermes-agent` must be run on the host before the agent can start.
+
+**Best for:** Operators who want cross-session memory continuity, a Python REPL environment, or want to evaluate Hermes alongside Claude Code agents on the same bus.
+
+**Key files:** `CLAUDE.md`, `config.json`, `.env.example`
+
+---
+
 ## Core Skills
 
 ### heartbeat

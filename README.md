@@ -100,6 +100,41 @@ These are designed to work alongside your existing property management software.
 
 ---
 
+## Hermes agent
+
+The `agents/hermes/` template runs on the [Hermes](https://github.com/NousResearch/hermes-agent) Python REPL runtime instead of Claude Code. It participates in the bus identically — heartbeat, inbox, tasks, events — but uses SQLite for cross-session memory and manages its own scheduling.
+
+**Two-step install:**
+
+**Step 1 — Install the Hermes binary**
+
+```bash
+pip install hermes-agent
+```
+
+Verify:
+```bash
+which hermes
+```
+
+The daemon cannot start the agent until this binary is on PATH.
+
+**Step 2 — Use this template**
+
+```bash
+cp -r ascendops-agent-pack/agents/hermes /path/to/cortextos/orgs/myorg/agents/myagent
+```
+
+Edit `config.json` (set `agent_name`, `timezone`) and `IDENTITY.md`, then:
+
+```bash
+cortextos start myagent
+```
+
+See `agents/hermes/CLAUDE.md` for full setup details and runtime differences vs Claude Code agents.
+
+---
+
 ## What's included
 
 See [AGENTS.md](AGENTS.md) for the full catalog of agents and skills.
