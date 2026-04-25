@@ -1,13 +1,20 @@
 ---
 name: pm-session-recapture
 effort: medium
-description: "When pm probe returns 401/403 (session expired), automatically recapture PropertyMeld session cookies using osascript Chrome control + Chrome DevTools Protocol. Restores full snapcli functionality without human intervention."
+description: "When pm probe returns 401/403 (session expired), automatically recapture PropertyMeld session cookies. macOS agents use the AX+CDP script; Linux/cloud agents use the Playwright headless script."
 triggers: ["pm session expired", "pm probe 401", "pm probe failed", "session recapture", "cookies expired", "recapture pm session", "pm auth broken"]
 ---
 
 # PM Session Recapture
 
-Automated recovery when PropertyMeld session cookies expire. Uses the live Chrome browser (via osascript) + Chrome DevTools Protocol to re-login and extract fresh cookies.
+Automated recovery when PropertyMeld session cookies expire. Two implementations — pick based on your platform:
+
+| Platform | Script | How it works |
+|----------|--------|--------------|
+| **macOS** | `scripts/pm-recapture-session.py` | Drives live Chrome via osascript + CDP |
+| **Linux / cloud** | `scripts/pm-recapture-session-playwright.py` | Headless Chromium via Playwright |
+
+Both require `PM_WEB_EMAIL` and `PM_WEB_PASSWORD`. Both write the same cookie format to `PM_CREDS_PATH`.
 
 ---
 
@@ -48,10 +55,17 @@ If status is error/401/403: proceed.
 
 ## Step 2 — Run the recapture script
 
+**macOS:**
 ```bash
-cd <agent-dir>
 PM_WEB_EMAIL="$PM_WEB_EMAIL" PM_WEB_PASSWORD="$PM_WEB_PASSWORD" python3 scripts/pm-recapture-session.py
 ```
+
+**Linux / cloud (requires `pip install playwright && playwright install chromium`):**
+```bash
+PM_WEB_EMAIL="$PM_WEB_EMAIL" PM_WEB_PASSWORD="$PM_WEB_PASSWORD" python3 scripts/pm-recapture-session-playwright.py
+```
+
+Both scripts are in `adapters/pm/scripts/` in noogalabs/snapcli.
 
 Script will:
 1. Launch Chrome with  if not already running with it
