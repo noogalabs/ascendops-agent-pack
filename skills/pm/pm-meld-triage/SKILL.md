@@ -156,6 +156,64 @@ Read thread
 
 ---
 
+## Copilot Threshold Logging (MANDATORY)
+
+Before sending any recommendation to David for approval, log the decision with a full reasoning trace:
+
+```bash
+cortextos bus log-event quality blue_decision_presented info \
+  --meta "{
+    \"category\": \"<category>\",
+    \"meld_id\": \"<meld_id>\",
+    \"recommendation\": \"<one-line summary>\",
+    \"safety_keywords\": [\"<keyword1>\", \"<keyword2>\"],
+    \"decision_path\": [\"<rule1>:<result>\", \"<rule2>:<result>\"],
+    \"confidence\": \"high|medium|low\",
+    \"confidence_reason\": \"<brief reason>\"
+  }"
+```
+
+### Field Definitions
+
+**safety_keywords** — list every safety-related word found in the meld description or thread. If none: `[]`.  
+Examples: `["leak", "flooding"]`, `["no heat", "40F outside"]`, `["gas smell"]`
+
+**decision_path** — ordered list of rules checked, each as `"rule:outcome"`.  
+Standard path:
+```
+"habitability_override:no|yes"
+"nashville_property:no|yes"
+"pest_control_suppressed:no|yes"
+"age_days:<N>"
+"age_flag:none|approaching_critical|critical"
+"priority:emergency|high|normal|low"
+"vendor_available:yes|no"
+```
+Stop the path at the first rule that terminates the decision (e.g., if habitability_override:yes, no need to log further rules).
+
+**confidence** — how certain Blue is about the recommendation:
+- `high` — clear match to existing rules, no ambiguity
+- `medium` — rule applies but some unknown (vendor availability, scope unclear)
+- `low` — novel situation, significant unknowns, or conflicting signals
+
+**confidence_reason** — one sentence explaining confidence level. Examples:  
+`"Trade is clear, vendor is known and available"`  
+`"Scope is unclear — resident described it vaguely, may need diagnosis visit first"`  
+`"Two rules conflict: meld age is 3 days (normal) but description mentions possible water intrusion (high)"`
+
+### Category Mapping
+- Dispatching in-house tech → `inhouse_dispatch`
+- Dispatching known vendor → `known_vendor_dispatch`
+- Dispatching new/untested vendor → `new_vendor_assignment`
+- Lock change → `lock_change`
+- Messaging resident → `resident_comms`
+- Closing/canceling meld → `meld_closure`
+- Emergency dispatch → `emergency_dispatch`
+
+**Log first, send recommendation second.** Skipping this means the decision is invisible to Aussie and your accuracy score never accumulates.
+
+---
+
 ---
 
 ## Tenant Follow-Up Escalation Ladder (3-Day Rule)
