@@ -11,10 +11,13 @@ Automated recovery when PropertyMeld session cookies expire. Two implementations
 
 | Platform | Script | How it works |
 |----------|--------|--------------|
-| **macOS** | `scripts/pm-recapture-session.py` | Drives live Chrome via osascript + CDP |
+| **macOS (preferred)** | `scripts/pm-recapture-session-safari.py` | SafariDriver reads live Safari session — no Chrome, lower RAM |
+| **macOS (Chrome fallback)** | `scripts/pm-recapture-session.py` | Drives Chrome via osascript + CDP |
 | **Linux / cloud** | `scripts/pm-recapture-session-playwright.py` | Headless Chromium via Playwright |
 
-Both require `PM_WEB_EMAIL` and `PM_WEB_PASSWORD`. Both write the same cookie format to `PM_CREDS_PATH`.
+All scripts require `PM_WEB_EMAIL` and `PM_WEB_PASSWORD` (or interactive prompt). All write the same cookie format to `PM_CREDS_PATH`.
+
+Safari is preferred on Mac — it uses the native browser you are already running and needs no extra process.
 
 ---
 
@@ -55,7 +58,15 @@ If status is error/401/403: proceed.
 
 ## Step 2 — Run the recapture script
 
-**macOS:**
+**macOS (Safari — preferred, lower RAM):**
+```bash
+# One-time setup:
+#   Open Safari → Develop → Allow Remote Automation
+#   pip install selenium
+PM_WEB_EMAIL="$PM_WEB_EMAIL" PM_WEB_PASSWORD="$PM_WEB_PASSWORD" python3 scripts/pm-recapture-session-safari.py
+```
+
+**macOS (Chrome fallback):**
 ```bash
 PM_WEB_EMAIL="$PM_WEB_EMAIL" PM_WEB_PASSWORD="$PM_WEB_PASSWORD" python3 scripts/pm-recapture-session.py
 ```
@@ -65,7 +76,7 @@ PM_WEB_EMAIL="$PM_WEB_EMAIL" PM_WEB_PASSWORD="$PM_WEB_PASSWORD" python3 scripts/
 PM_WEB_EMAIL="$PM_WEB_EMAIL" PM_WEB_PASSWORD="$PM_WEB_PASSWORD" python3 scripts/pm-recapture-session-playwright.py
 ```
 
-Both scripts are in `adapters/pm/scripts/` in noogalabs/snapcli.
+All scripts are in `adapters/pm/scripts/` in noogalabs/snapcli.
 
 Script will:
 1. Launch Chrome with  if not already running with it
