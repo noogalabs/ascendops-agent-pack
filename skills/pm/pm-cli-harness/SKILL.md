@@ -9,8 +9,45 @@ triggers: ["pm work-orders", "pm cli", "snapcli pm", "pm command", "work order c
 
 ## Install
 
+**Step 1 — Install the CLI:**
 ```bash
 pip install "git+https://github.com/noogalabs/snapcli.git#subdirectory=adapters/pm"
+```
+
+**Step 2 — Install session recapture dependencies:**
+
+macOS:
+```bash
+# No extra installs needed — uses built-in osascript + Chrome
+```
+
+Linux / cloud (Railway, VPS, Docker):
+```bash
+pip install playwright
+playwright install chromium
+```
+
+**Step 3 — Set required env vars** (add to agent `.env`):
+```
+PM_CREDS_PATH=~/.snapcli/property-meld.json   # session cookies
+PM_WEB_EMAIL=your@email.com                    # PM login — for recapture only
+PM_WEB_PASSWORD=yourpassword                   # PM login — for recapture only
+PM_CLIENT_ID=...                               # Nexus API — reads only
+PM_CLIENT_SECRET=...
+```
+
+**Step 4 — Capture initial session cookies:**
+```bash
+# macOS:
+python3 scripts/pm-recapture-session.py
+
+# Linux / cloud:
+python3 scripts/pm-recapture-session-playwright.py
+```
+
+**Step 5 — Verify:**
+```bash
+pm probe --json   # should return {"ok": true}
 ```
 
 For all available commands:
@@ -18,13 +55,6 @@ For all available commands:
 pm --help
 pm work-orders --help
 pm tenants --help
-```
-
-Required env / credentials:
-```
-PM_CREDS_PATH=~/.snapcli/property-meld.json   # session cookies (see pm-session-recapture skill)
-PM_CLIENT_ID=...                               # Nexus API — reads only
-PM_CLIENT_SECRET=...
 ```
 
 ---
